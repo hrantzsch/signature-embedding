@@ -9,8 +9,8 @@ from chainer import optimizers, report, training
 from chainer.datasets import ImageDataset
 from chainer.training import extensions
 
+import triplet
 from triplet_iterator import TripletIterator
-from triplet_updater import TripletUpdater
 
 
 class MLP(Chain):
@@ -44,25 +44,14 @@ def usage():
     print("python3 {} <config_file.ini>".format(sys.argv[0]))
 
 
-def get_iterator(index, batch_size):
-    data = ImageDataset(index)
-    return TripletIterator(data, batch_size=batch_size)
-
-
-def get_updater(iterator):
-    model = Classifier(MLP(100, 10))
-    optimizer = optimizers.SGD(lr=0.000001)
-    optimizer.setup(model)
-    updater = TripletUpdater(train_iter, optimizer)
-    return updater
-
-
-def get_trainer(updater, epochs):
+def get_trainer(updater, evaluator, epochs):
     trainer = training.Trainer(updater, (epochs, 'epoch'), out='result')
+    trainer.extend(evaluator)
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.ProgressBar(
         (epochs, 'epoch'), update_interval=10))
-    trainer.extend(extensions.PrintReport(['epoch', 'main/loss']))
+    trainer.extend(extensions.PrintReport(
+        ['epoch', 'main/loss', 'validation/main/loss']))
     return trainer
 
 
@@ -73,12 +62,25 @@ if __name__ == '__main__':
 
     config = configparser.ConfigParser()
     config.read(sys.argv[1])
-    bs = int(config['TRAINING']['batch_size'])
-    train_iter = get_iterator(config['DATA']['train'], bs)
-    test_iter = get_iterator(config['DATA']['test'], bs)
 
-    updater = get_updater(train_iter)
-
+    batch_size = int(config['TRAINING']['batch_size'])
     epochs = int(config['TRAINING']['epochs'])
-    trainer = get_trainer(updater, epochs)
+    train_index = config['DATA']['train']
+    test_index = config['DATA']['test']
+
+    train_iter = TripletIterator(ImageDataset(train_index),
+                                 batch_size=batch_size,
+                                 repeat=True)
+    test_iter = TripletIterator(ImageDataset(test_index),
+                                batch_size=batch_size)
+
+    model = Classifier(MLP(100, 10))
+
+    optimizer = optimizers.SGD(lr=0.000001)
+    optimizer.setup(model)
+    updater = triplet.Updater(train_iter, optimizer)
+
+    evaluator = triplet.Evaluator(test_iter, model)
+
+    trainer = get_trainer(updater, evaluator, epochs)
     trainer.run()
