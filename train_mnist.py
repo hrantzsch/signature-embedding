@@ -47,6 +47,8 @@ def usage():
 def get_trainer(updater, evaluator, epochs):
     trainer = training.Trainer(updater, (epochs, 'epoch'), out='result')
     trainer.extend(evaluator)
+    # TODO: reduce LR -- how to update every X epochs?
+    # trainer.extend(extensions.ExponentialShift('lr', 0.1, target=lr*0.0001))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.ProgressBar(
         (epochs, 'epoch'), update_interval=10))
@@ -65,6 +67,9 @@ if __name__ == '__main__':
 
     batch_size = int(config['TRAINING']['batch_size'])
     epochs = int(config['TRAINING']['epochs'])
+    lr = float(config['TRAINING']['lr'])
+    lr_interval = int(config['TRAINING']['lr_interval'])
+
     train_index = config['DATA']['train']
     test_index = config['DATA']['test']
 
@@ -76,7 +81,7 @@ if __name__ == '__main__':
 
     model = Classifier(MLP(100, 10))
 
-    optimizer = optimizers.SGD(lr=0.000001)
+    optimizer = optimizers.SGD(lr=lr)
     optimizer.setup(model)
     updater = triplet.Updater(train_iter, optimizer)
 
