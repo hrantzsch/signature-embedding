@@ -6,7 +6,7 @@ from chainer.dataset import iterator
 
 
 class TripletIterator(iterator.Iterator):
-    def __init__(self, dataset, batch_size, repeat=True, shuffle=False):
+    def __init__(self, dataset, batch_size, repeat=False, shuffle=False):
         self.dataset = dataset
         self.batch_size = batch_size
         self._repeat = repeat
