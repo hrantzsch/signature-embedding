@@ -6,13 +6,13 @@ from chainer.dataset import iterator
 
 
 class TripletIterator(iterator.Iterator):
-    def __init__(self, dataset, batch_size, repeat=False, shuffle=False):
+    def __init__(self, dataset, batch_size, repeat=True, shuffle=False):
         self.dataset = dataset
         self.batch_size = batch_size
         self._repeat = repeat
 
-        if shuffle or repeat:
-            print("warning: shuffling or repeating TripletIterator NYI")
+        if shuffle:
+            print("warning: shuffling or TripletIterator NYI")
 
         self.current_position = 0
         self.epoch = 0

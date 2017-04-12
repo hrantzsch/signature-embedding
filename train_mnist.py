@@ -7,6 +7,7 @@ from chainer import functions as F
 from chainer import links as L
 from chainer import optimizers, report, training
 from chainer.datasets import ImageDataset
+from chainer.training import extensions
 
 from triplet_iterator import TripletIterator
 from triplet_updater import TripletUpdater
@@ -35,7 +36,6 @@ class Classifier(Chain):
     def __call__(self, x_a, x_p, x_n):
         y_a, y_p, y_n = (self.predictor(x) for x in (x_a, x_p, x_n))
         loss = F.triplet(y_a, y_p, y_n)
-        print(loss.data)
         report({'loss': loss}, self)
         return loss
 
@@ -44,33 +44,41 @@ def usage():
     print("python3 {} <config_file.ini>".format(sys.argv[0]))
 
 
-def log(msg):
-    print("# {}".format(msg))
+def get_iterator(index, batch_size):
+    data = ImageDataset(index)
+    return TripletIterator(data, batch_size=batch_size)
 
 
-def setup(config_file):
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    test_index = config['DATA']['test']
-    train_index = config['DATA']['train']
-    log("reading train data from {}".format(train_index))
-    log("reading test data from {}".format(test_index))
-    log("loading data...")
-    data_train = ImageDataset(train_index)
-    train_iter = TripletIterator(data_train, batch_size=300, shuffle=False)
-    data_test = ImageDataset(test_index)
-    test_iter = TripletIterator(data_test, batch_size=300, shuffle=False)
-
+def get_updater(iterator):
     model = Classifier(MLP(100, 10))
     optimizer = optimizers.SGD(lr=0.000001)
     optimizer.setup(model)
+    updater = TripletUpdater(train_iter, optimizer)
+    return updater
 
-    return TripletUpdater(train_iter, optimizer)
+
+def get_trainer(updater, epochs):
+    trainer = training.Trainer(updater, (epochs, 'epoch'), out='result')
+    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.ProgressBar(
+        (epochs, 'epoch'), update_interval=10))
+    trainer.extend(extensions.PrintReport(['epoch', 'main/loss']))
+    return trainer
 
 
 if __name__ == '__main__':
     if not len(sys.argv) == 2:
         usage()
         exit(1)
-    updater = setup(sys.argv[1])
-    training.Trainer(updater, (20, 'epoch'), out='result').run()
+
+    config = configparser.ConfigParser()
+    config.read(sys.argv[1])
+    bs = int(config['TRAINING']['batch_size'])
+    train_iter = get_iterator(config['DATA']['train'], bs)
+    test_iter = get_iterator(config['DATA']['test'], bs)
+
+    updater = get_updater(train_iter)
+
+    epochs = int(config['TRAINING']['epochs'])
+    trainer = get_trainer(updater, epochs)
+    trainer.run()
