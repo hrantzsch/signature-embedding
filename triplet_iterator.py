@@ -6,7 +6,7 @@ from chainer.dataset import iterator
 
 
 class TripletIterator(iterator.Iterator):
-    def __init__(self, dataset, batch_size, repeat=False, shuffle=False):
+    def __init__(self, dataset, batch_size, repeat=False, shuffle=False, xp=np):
         self.dataset = dataset
         self.batch_size = batch_size
         self._repeat = repeat
@@ -17,6 +17,7 @@ class TripletIterator(iterator.Iterator):
         self.current_position = 0
         self.epoch = 0
         self.is_new_epoch = False
+        self.xp = xp
 
     def __next__(self):
         if not self._repeat and self.epoch > 0:
@@ -26,10 +27,10 @@ class TripletIterator(iterator.Iterator):
         i_end = i + 3 * self.batch_size
         N = len(self.dataset)
 
-        batches = np.array(self.dataset[i:i_end])
-        batch_anc = batches[np.arange(0, len(batches), 3)]
-        batch_pos = batches[np.arange(1, len(batches), 3)]
-        batch_neg = batches[np.arange(2, len(batches), 3)]
+        batches = self.xp.array(self.dataset[i:i_end])
+        batch_anc = batches[self.xp.arange(0, len(batches), 3)]
+        batch_pos = batches[self.xp.arange(1, len(batches), 3)]
+        batch_neg = batches[self.xp.arange(2, len(batches), 3)]
 
         self.is_new_epoch = i_end >= N
         if self.is_new_epoch:

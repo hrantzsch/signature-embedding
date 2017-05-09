@@ -3,11 +3,15 @@ import configparser
 import sys
 
 from chainer import Chain
+from chainer import cuda
 from chainer import functions as F
 from chainer import links as L
 from chainer import optimizers, report, training
+
 from chainer.datasets import ImageDataset
 from chainer.training import extensions
+
+import numpy as np
 
 import triplet
 from triplet_iterator import TripletIterator
@@ -69,17 +73,26 @@ if __name__ == '__main__':
     epochs = int(config['TRAINING']['epochs'])
     lr = float(config['TRAINING']['lr'])
     lr_interval = int(config['TRAINING']['lr_interval'])
+    gpu = int(config['TRAINING']['gpu'])
 
     train_index = config['DATA']['train']
     test_index = config['DATA']['test']
 
+    xp = cuda.cupy if gpu >= 0 else np
+
     train_iter = TripletIterator(ImageDataset(train_index),
                                  batch_size=batch_size,
-                                 repeat=True)
+                                 repeat=True,
+                                 xp=xp)
     test_iter = TripletIterator(ImageDataset(test_index),
-                                batch_size=batch_size)
+                                batch_size=batch_size,
+                                xp=xp)
 
     model = Classifier(MLP(100, 10))
+
+    if gpu >= 0:
+        cuda.get_device(gpu).use()
+        model.to_gpu()
 
     optimizer = optimizers.SGD(lr=lr)
     optimizer.setup(model)
